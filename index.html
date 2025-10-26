@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Outbound Manager - B4UBiz Digital Signage</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚀</text></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-blue: #4285F4;
+            --primary-orange: #FBBC05;
+            --primary-red: #EA4335;
+            --primary-green: #34A853;
+            --primary-gray: #9AA0A6;
+            --primary-purple: #8E44AD;
+            --dark-bg: #0F1C3F;
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --text-dark: #202124;
+            --text-light: #5F6368;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, var(--dark-bg) 0%, #1E3A8A 100%);
+            color: var(--text-dark);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* 디지털 사이니지 레이아웃 */
+        .digital-signage {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+            min-height: 100vh;
+            max-width: 1920px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 1024px) {
+            .digital-signage {
+                grid-template-columns: 1fr;
+                padding: 10px;
+            }
+        }
+
+        /* 패널 공통 스타일 */
+        .panel {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* 캘린더 패널 */
+        .calendar-panel {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 헤더 스타일 */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .title {
+            font-size: 2.2em;
+            font-weight: 700;
+            color: inherit;
+        }
+
+        .calendar-panel .title {
+            color: white;
+        }
+
+        .datetime-display {
+            text-align: right;
+        }
+
+        .current-date {
+            font-size: 1.4em;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: inherit;
+        }
+
+        .current-time {
+            font-size: 2em;
+            font-weight: 700;
+            color: inherit;
+            font-family: 'Courier New', monospace;
+        }
+
+        .calendar-panel .current-date,
+        .calendar-panel .current-time {
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        /* 캘린더 이벤트 */
+        .calendar-events {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .calendar-event {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 18px;
+            border-radius: 12px;
+            border-left: 6px solid var(--primary-green);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .calendar-event:hover {
+            transform: translateX(5px);
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .event-summary {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .event-time {
+            font-size: 0.95em;
+            opacity: 0.9;
+        }
+
+        /* 외근 상황표 */
+        .outbound-panel {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .status-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .status-item {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid var(--primary-blue);
+        }
+
+        .status-item.office { border-left-color: var(--primary-blue); }
+        .status-item.outbound { border-left-color: var(--primary-orange); }
+        .status-item.absent { border-left-color: var(--primary-red); }
+        .status-item.returned { border-left-color: var(--primary-gray); }
+        .status-item.vacation { border-left-color: var(--primary-purple); }
+
+        .status-count {
+            font-size: 1.8em;
+            font-weight: 700;
+            display: block;
+        }
+
+        .status-label {
+            font-size: 0.9em;
+            color: var(--text-light);
+            margin-top: 5px;
+        }
+
+        /* 외근 목록 */
+        .outbound-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex: 1;
+            max-height: 60vh;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .outbound-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .outbound-list::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 3px;
+        }
+
+        .outbound-list::-webkit-scrollbar-thumb {
+            background: var(--primary-blue);
+            border-radius: 3px;
+        }
+
+        .outbound-card {
+            background: linear-gradient(135deg, var(--primary-blue), #3367D6);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 15px;
+            align-items: center;
+            box-shadow: 0 5px 15px rgba(66, 133, 244, 0.3);
+            transition: all 0.3s ease;
+            animation: slideInUp 0.5s ease;
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .outbound-card.outbound {
+            background: linear-gradient(135deg, var(--primary-orange), #E2A400);
+            box-shadow: 0 5px 15px rgba(251, 188, 5, 0.3);
+        }
+
+        .outbound-card.returned {
+            background: linear-gradient(135deg, var(--primary-gray), #80868B);
+            box-shadow: 0 5px 15px rgba(154, 160, 166, 0.3);
+        }
+
+        .outbound-card.absent {
+            background: linear-gradient(135deg, var(--primary-red), #D23A2D);
+            box-shadow: 0 5px 15px rgba(234, 67, 53, 0.3);
+        }
+
+        .outbound-card.vacation {
+            background: linear-gradient(135deg, var(--primary-purple), #7D3C98);
+            box-shadow: 0 5px 15px rgba(142, 68, 173, 0.3);
+        }
+
+        .outbound-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .user-name {
+            font-size: 1.3em;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .user-department {
+            font-size: 0.9em;
+            opacity: 0.8;
+            margin-bottom: 6px;
+        }
+
+        .location {
+            font-size: 1.1em;
+            font-weight: 600;
+            opacity: 0.95;
+        }
+
+        .time-info {
+            text-align: center;
+            min-width: 100px;
+        }
+
+        .time-label {
+            font-size: 0.85em;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+
+        .time-value {
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .action-button:hover {
+            background: white;
+            color: var(--text-dark);
+            transform: translateY(-2px);
+        }
+
+        /* 로그인 모달 */
+        .login-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 28, 63, 0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+
+        .login-container {
+            background: var(--card-bg);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        .login-title {
+            font-size: 2.5em;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-blue), var(--primary-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 30px;
+        }
+
+        .user-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+
+        .user-button {
+            background: white;
+            color: var(--text-dark);
+            border: 2px solid var(--primary-blue);
+            padding: 15px 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: 0.95em;
+        }
+
+        .user-button.selected {
+            background: var(--primary-blue);
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .user-button:hover {
+            background: var(--primary-blue);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(66, 133, 244, 0.3);
+        }
+
+        .password-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            margin-bottom: 20px;
+            transition: border-color 0.3s ease;
+        }
+
+        .password-input:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1);
+        }
+
+        .login-button {
+            width: 100%;
+            background: linear-gradient(135deg, var(--primary-blue), #3367D6);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .login-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(66, 133, 244, 0.4);
+        }
+
+        .error-message {
+            color: var(--primary-red);
+            text-align: center;
+            margin-top: 15px;
+            font-weight: 500;
+        }
+
+        /* 관리자 패널 */
+        .admin-panel {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 400px;
+            height: 100vh;
+            background: var(--card-bg);
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
+            transition: right 0.3s ease;
+            z-index: 999;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .admin-panel.open {
+            right: 0;
+        }
+
+        .admin-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 1.5em;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(66, 133, 244, 0.3);
+            transition: all 0.3s ease;
+            z-index: 998;
+        }
+
+        .admin-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(66, 133, 244, 0.4);
+        }
+
+        /* 반응형 디자인 */
+        @media (max-width: 768px) {
+            .digital-signage {
+                padding: 10px;
+                gap: 15px;
+            }
+            
+            .panel {
+                padding: 20px;
+                border-radius: 15px;
+            }
+            
+            .title {
+                font-size: 1.8em;
+            }
+            
+            .current-time {
+                font-size: 1.6em;
+            }
+            
+            .outbound-card {
+                grid-template-columns: 1fr;
+                gap: 12px;
+                text-align: center;
+            }
+            
+            .action-buttons {
+                justify-content: center;
+            }
+            
+            .user-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .admin-panel {
+                width: 100%;
+                right: -100%;
+            }
+        }
+
+        /* 애니메이션 */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <!-- 디지털 사이니지 메인 화면 -->
+    <div id="digitalSignage" class="digital-signage" style="display: none;">
+        <!-- 좌측: 구글 캘린더 -->
+        <div class="panel calendar-panel">
+            <div class="header">
+                <h1 class="title">📅 사내 캘린더</h1>
+                <div class="datetime-display">
+                    <div id="currentDate" class="current-date">2024년 1월 15일 월요일</div>
+                    <div id="currentTime" class="current-time">00:00:00</div>
+                </div>
+            </div>
+            <div class="calendar-events" id="calendarEvents">
+                <!-- 캘린더 이벤트가 동적으로 로드됩니다 -->
+            </div>
+        </div>
+
+        <!-- 우측: 외근 상황표 -->
+        <div class="panel outbound-panel">
+            <div class="header">
+                <h1 class="title">👥 외근 상황표</h1>
+            </div>
+            
+            <!-- 상태 요약 -->
+            <div class="status-summary" id="statusSummary">
+                <!-- 상태 요약이 동적으로 로드됩니다 -->
+            </div>
+
+            <!-- 외근 목록 -->
+            <div class="outbound-list" id="outboundList">
+                <!-- 외근 목록이 동적으로 로드됩니다 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 로그인 모달 -->
+    <div id="loginModal" class="login-modal">
+        <div class="login-container">
+            <h1 class="login-title">Outbound Manager</h1>
+            <div class="user-grid" id="userGrid">
+                <!-- 사용자 버튼이 동적으로 로드됩니다 -->
+            </div>
+            <div id="loginForm" style="display: none;">
+                <input type="password" class="password-input" id="passwordInput" 
+                       placeholder="비밀번호를 입력하세요 (1234)" autocomplete="off">
+                <button class="login-button" onclick="handleLogin()">🚀 로그인</button>
+            </div>
+            <div class="error-message" id="errorMessage"></div>
+        </div>
+    </div>
+
+    <!-- 관리자 패널 토글 버튼 -->
+    <button class="admin-toggle" onclick="toggleAdminPanel()">⚙️</button>
+
+    <!-- 관리자 패널 -->
+    <div id="adminPanel" class="admin-panel">
+        <div class="header">
+            <h2 class="title">관리자 패널</h2>
+            <button class="action-button" onclick="toggleAdminPanel()" style="color: var(--text-dark); border-color: var(--text-light);">✕</button>
+        </div>
+        <div id="adminContent">
+            <!-- 관리자 콘텐츠가 동적으로 로드됩니다 -->
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // 전역 변수
+        let socket = null;
+        let currentUser = null;
+
+        // DOM 로드 완료 후 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            checkLoginStatus();
+            initializeSocket();
+            updateDateTime();
+            // 1초마다 시간 업데이트
+            setInterval(updateDateTime, 1000);
+        }
+
+        function initializeSocket() {
+            socket = io();
+            
+            socket.on('outboundUpdate', function(outbounds) {
+                renderOutboundList(outbounds);
+            });
+            
+            socket.on('statusUpdate', function(summary) {
+                renderStatusSummary(summary);
+            });
+            
+            socket.on('timeUpdate', function(timeData) {
+                document.getElementById('currentDate').textContent = timeData.currentDate;
+                document.getElementById('currentTime').textContent = timeData.currentTime;
+            });
+        }
+
+        function updateDateTime() {
+            const now = new Date();
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                weekday: 'long'
+            });
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString('ko-KR');
+        }
+
+        function checkLoginStatus() {
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('user');
+
+            if (token && user) {
+                currentUser = JSON.parse(user);
+                showDigitalSignage();
+            } else {
+                showLoginModal();
+            }
+        }
+
+        function showLoginModal() {
+            document.getElementById('loginModal').style.display = 'flex';
+            document.getElementById('digitalSignage').style.display = 'none';
+            renderUserGrid();
+        }
+
+        function showDigitalSignage() {
+            document.getElementById('loginModal').style.display = 'none';
+            document.getElementById('digitalSignage').style.display = 'grid';
+            loadCalendarEvents();
+            loadOutbounds();
+            loadStatusSummary();
+        }
+
+        function renderUserGrid() {
+            const users = [
+                '김민수', '이지연', '박성훈', '정유진', 
+                '최태영', '한소희', '윤도현'
+            ];
+            
+            const userGrid = document.getElementById('userGrid');
+            userGrid.innerHTML = users.map(user => `
+                <button class="user-button" onclick="selectUser('${user}')">
+                    ${user}
+                </button>
+            `).join('');
+        }
+
+        function selectUser(userName) {
+            document.querySelectorAll('.user-button').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            event.target.classList.add('selected');
+            
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('passwordInput').focus();
+        }
+
+        async function handleLogin() {
+            const selectedButton = document.querySelector('.user-button.selected');
+            if (!selectedButton) {
+                showError('사용자를 선택해주세요.');
+                return;
+            }
+
+            const userName = selectedButton.textContent.trim();
+            const password = document.getElementById('passwordInput').value;
+            const errorElement = document.getElementById('errorMessage');
+
+            if (!password) {
+                showError('비밀번호를 입력해주세요.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name: userName,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    currentUser = data.user;
+                    showDigitalSignage();
+                } else {
+                    showError(data.error || '로그인에 실패했습니다.');
+                }
+            } catch (error) {
+                showError('네트워크 오류가 발생했습니다.');
+            }
+        }
+
+        function showError(message) {
+            const errorElement = document.getElementById('errorMessage');
+            errorElement.textContent = message;
+            setTimeout(() => {
+                errorElement.textContent = '';
+            }, 3000);
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            currentUser = null;
+            showLoginModal();
+        }
+
+        async function loadCalendarEvents() {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch('/api/calendar/events', {
+                    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                });
+                const events = await response.json();
+                renderCalendarEvents(events);
+            } catch (error) {
+                console.error('Failed to load calendar events:', error);
+            }
+        }
+
+        function renderCalendarEvents(events) {
+            const container = document.getElementById('calendarEvents');
+            
+            if (events.length === 0) {
+                container.innerHTML = '<div class="calendar-event">등록된 일정이 없습니다.</div>';
+                return;
+            }
+
+            container.innerHTML = events.map(event => {
+                const startTime = new Date(event.start.dateTime).toLocaleTimeString('ko-KR', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                const endTime = new Date(event.end.dateTime).toLocaleTimeString('ko-KR', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                return `
+                    <div class="calendar-event">
+                        <div class="event-summary">${event.summary}</div>
+                        <div class="event-time">${startTime} - ${endTime}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function loadOutbounds() {
+            try {
+                const response = await fetch('/api/outbounds/current');
+                const outbounds = await response.json();
+                renderOutboundList(outbounds);
+            } catch (error) {
+                console.error('Failed to load outbounds:', error);
+            }
+        }
+
+        function renderOutboundList(outbounds) {
+            const container = document.getElementById('outboundList');
+            
+            if (outbounds.length === 0) {
+                container.innerHTML = '<div class="outbound-card">현재 외근 중인 사원이 없습니다.</div>';
+                return;
+            }
+
+            container.innerHTML = outbounds.map(outbound => {
+                const outTime = new Date(outbound.outTime).toLocaleTimeString('ko-KR', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                return `
+                    <div class="outbound-card outbound">
+                        <div class="user-info">
+                            <div class="user-name">${outbound.userName}</div>
+                            <div class="user-department">${outbound.department}</div>
+                            <div class="location">📍 ${outbound.location}</div>
+                        </div>
+                        <div class="time-info">
+                            <div class="time-label">출사시간</div>
+                            <div class="time-value">${outTime}</div>
+                        </div>
+                        <div class="action-buttons">
+                            ${currentUser && (currentUser.role === 'admin' || currentUser.name === outbound.userName) ? 
+                                `<button class="action-button" onclick="handleReturn(${outbound.id})">귀사</button>` : 
+                                ''
+                            }
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function loadStatusSummary() {
+            try {
+                const response = await fetch('/api/status/summary');
+                const summary = await response.json();
+                renderStatusSummary(summary);
+            } catch (error) {
+                console.error('Failed to load status summary:', error);
+            }
+        }
+
+        function renderStatusSummary(summary) {
+            const container = document.getElementById('statusSummary');
+            
+            container.innerHTML = `
+                <div class="status-item office">
+                    <span class="status-count">${summary.office}</span>
+                    <span class="status-label">사무실</span>
+                </div>
+                <div class="status-item outbound">
+                    <span class="status-count">${summary.outbound}</span>
+                    <span class="status-label">외근 중</span>
+                </div>
+                <div class="status-item absent">
+                    <span class="status-count">${summary.absent}</span>
+                    <span class="status-label">미등록</span>
+                </div>
+                <div class="status-item returned">
+                    <span class="status-count">${summary.returned}</span>
+                    <span class="status-label">귀사</span>
+                </div>
+                <div class="status-item vacation">
+                    <span class="status-count">${summary.vacation}</span>
+                    <span class="status-label">휴일</span>
+                </div>
+            `;
+        }
+
+        async function handleReturn(outboundId) {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`/api/outbounds/${outboundId}/return`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    // 소켓을 통해 실시간 업데이트
+                    loadOutbounds();
+                    loadStatusSummary();
+                } else {
+                    alert('귀사 처리에 실패했습니다.');
+                }
+            } catch (error) {
+                console.error('Failed to return:', error);
+                alert('네트워크 오류가 발생했습니다.');
+            }
+        }
+
+        function toggleAdminPanel() {
+            const panel = document.getElementById('adminPanel');
+            panel.classList.toggle('open');
+            
+            if (panel.classList.contains('open')) {
+                loadAdminContent();
+            }
+        }
+
+        async function loadAdminContent() {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch('/api/admin/stats', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const stats = await response.json();
+                    renderAdminContent(stats);
+                } else {
+                    document.getElementById('adminContent').innerHTML = '<p>관리자 권한이 필요합니다.</p>';
+                }
+            } catch (error) {
+                console.error('Failed to load admin content:', error);
+            }
+        }
+
+        function renderAdminContent(stats) {
+            const container = document.getElementById('adminContent');
+            
+            container.innerHTML = `
+                <h3>📊 실시간 현황</h3>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <div>총 사원: ${stats.totalUsers}명</div>
+                    <div>사무실: ${stats.summary.office}명</div>
+                    <div>외근 중: ${stats.summary.outbound}명</div>
+                    <div>미등록: ${stats.summary.absent}명</div>
+                </div>
+                
+                <h3>👥 사원별 현황</h3>
+                <div style="max-height: 300px; overflow-y: auto;">
+                    ${stats.userStats.map(user => `
+                        <div style="background: white; padding: 10px; margin: 5px 0; border-radius: 8px; border-left: 4px solid #4285F4;">
+                            <strong>${user.userName}</strong> (${user.department})<br>
+                            <small>현재: ${user.currentStatus} | 위치: ${user.currentLocation}</small><br>
+                            <small>최근 활동: ${user.lastActivity}</small>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <button class="login-button" onclick="handleLogout()" style="margin-top: 20px; background: #EA4335;">
+                    로그아웃
+                </button>
+            `;
+        }
+
+        // 엔터 키로 로그인
+        document.getElementById('passwordInput')?.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handleLogin();
+            }
+        });
+
+        // 전자칠판 자동 새로고침 (10분마다)
+        setInterval(() => {
+            if (currentUser) {
+                loadCalendarEvents();
+                loadOutbounds();
+                loadStatusSummary();
+            }
+        }, 600000);
+    </script>
+</body>
+</html>
